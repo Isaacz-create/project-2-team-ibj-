@@ -3,7 +3,7 @@ from bs4 import BeautifulSoup
 import pandas as pd
 import matplotlib.pyplot as plt
 
-# Dictionary of team URLs
+# Dictionary of sports team URLs
 sports_teams = {
     'mens_volleyball': [
         'https://ccnyathletics.com/sports/mens-volleyball/roster',
@@ -53,63 +53,85 @@ sports_teams = {
     ]
 }
 
+# Function to scrape data from a list of URLs
 def process_data(urls):
     names = []
     heights = []
 
     for url in urls:
-        response = requests.get(url)
-        if response.status_code == 200:
-            soup = BeautifulSoup(response.text, 'html.parser')
+        page = requests.get(url)
+        if page.status_code == 200:
+            soup = BeautifulSoup(page.content, 'html.parser')
             name_tags = soup.find_all('td', class_='sidearm-table-player-name')
             height_tags = soup.find_all('td', class_='height')
 
-            for name_tag, height_tag in zip(name_tags, height_tags):
-                name = name_tag.get_text(strip=True)
-                raw_height = height_tag.get_text(strip=True)
+            for name_tag in name_tags:
+                names.append(name_tag.get_text().strip())
 
+            for height_tag in height_tags:
+                raw_height = height_tag.get_text().strip()
                 if '-' in raw_height:
-                    split_height = raw_height.split('-')
+                    parts = raw_height.split('-')
+                    if len(parts) == 2 and parts[0].isdigit() and parts[1].isdigit():
+                        feet = float(parts[0]) * 12
+                        inches = float(parts[1])
+                        height_in_inches = feet + inches
+                        heights.append(height_in_inches)
+                    else:
+                        heights.append(None)
+                else:
+                    heights.append(None)
 
-                    if len(split_height) == 2 and split_height[0].isdigit() and split_height[1].isdigit():
-                        feet = int(split_height[0])
-                        inches = int(split_height[1])
-                        total_inches = feet * 12 + inches
+    df = pd.DataFrame({'Name': names, 'Height': heights})
+    avg_height = df['Height'].mean()
+    df['Height'] = df['Height'].fillna(avg_height)
 
-                        names.append(name)
-                        heights.append(total_inches)
+    return df, avg_height
 
-    return pd.DataFrame({'name': names, 'height': heights})
+# Scrape data and calculate averages
+mens_volleyball_df, mv_avg = process_data(sports_teams['mens_volleyball'])
+mens_swimming_df, ms_avg = process_data(sports_teams['mens_swimming'])
+womens_volleyball_df, wv_avg = process_data(sports_teams['womens_volleyball'])
+womens_swimming_df, ws_avg = process_data(sports_teams['womens_swimming'])
 
-# Process data
-mens_volleyball_df = process_data(sports_teams['mens_volleyball'])
-mens_swimming_df = process_data(sports_teams['mens_swimming'])
-womens_volleyball_df = process_data(sports_teams['womens_volleyball'])
-womens_swimming_df = process_data(sports_teams['womens_swimming'])
-
-# Save to CSV
+# Save each DataFrame as CSV
 mens_volleyball_df.to_csv('mens_volleyball.csv', index=False)
 mens_swimming_df.to_csv('mens_swimming.csv', index=False)
 womens_volleyball_df.to_csv('womens_volleyball.csv', index=False)
 womens_swimming_df.to_csv('womens_swimming.csv', index=False)
 
-# Calculate averages
-print("\nAverage Heights:")
-print("Men's Volleyball:", mens_volleyball_df['height'].mean())
-print("Men's Swimming:", mens_swimming_df['height'].mean())
-print("Women's Volleyball:", womens_volleyball_df['height'].mean())
-print("Women's Swimming:", womens_swimming_df['height'].mean())
+# Print average heights
+print("Average Heights:")
+print("Men's Volleyball:", mv_avg)
+print("Men's Swimming:", ms_avg)
+print("Women's Volleyball:", wv_avg)
+print("Women's Swimming:", ws_avg)
 
-# Tallest and Shortest
-def extremes(df, label):
-    tallest = df[df['height'] >= df['height'].nlargest(5).min()]
-    shortest = df[df['height'] <= df['height'].nsmallest(5).max()]
+# Function to print tallest/shortest with ties
+def print_extremes(df, label):
+    tallest = df[df['Height'] >= df['Height'].nlargest(5).min()]
+    shortest = df[df['Height'] <= df['Height'].nsmallest(5).max()]
     print(f"\nTallest {label}:")
     print(tallest)
     print(f"\nShortest {label}:")
     print(shortest)
 
-extremes(mens_volleyball_df, "Men's Volleyball")
-extremes(mens_swimming_df, "Men's Swimming")
-extremes(womens_volleyball_df, "Women's Volleyball")
-extremes(womens_swimming_df, "Women's Swimming")
+# Print all tallest and shortest athlete lists
+print_extremes(mens_swimming_df, "Men's Swimming")
+print_extremes(mens_volleyball_df, "Men's Volleyball")
+print_extremes(womens_swimming_df, "Women's Swimming")
+print_extremes(womens_volleyball_df, "Women's Volleyball")
+
+# Plot bar graph of all 4 averages
+labels = ['Men\'s Swimming', 'Men\'s Volleyball', 'Women\'s Swimming', 'Women\'s Volleyball']
+averages = [ms_avg, mv_avg, ws_avg, wv_avg]
+
+plt.figure(figsize=(10, 6))
+plt.bar(labels, averages)
+plt.ylabel('Average Height (inches)')
+plt.title('Average Athlete Height by Team Category')
+plt.xticks(rotation=15)
+plt.grid(axis='y')
+plt.tight_layout()
+plt.savefig('average_heights_bargraph.png')
+plt.show()

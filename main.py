@@ -2,6 +2,7 @@ import requests
 from bs4 import BeautifulSoup
 import pandas as pd
 import matplotlib.pyplot as plt
+import sqlite3
 
 # Dictionary of sports team URLs
 sports_teams = {
@@ -135,3 +136,14 @@ plt.grid(axis='y')
 plt.tight_layout()
 plt.savefig('average_heights_bargraph.png')
 plt.show()
+
+conn = sqlite3.connect('athlete_heights.db')
+
+# Save each DataFrame to its respective table
+mens_volleyball_df.to_sql('mens_volleyball', conn, if_exists='replace', index=False)
+mens_swimming_df.to_sql('mens_swimming', conn, if_exists='replace', index=False)
+womens_volleyball_df.to_sql('womens_volleyball', conn, if_exists='replace', index=False)
+womens_swimming_df.to_sql('womens_swimming', conn, if_exists='replace', index=False)
+
+conn.commit()
+conn.close()
